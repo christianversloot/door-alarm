@@ -1,0 +1,16 @@
+.accord-block {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.accord-block-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.accord-block-content button {
+  margin-top: 15px;
+}
