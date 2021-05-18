@@ -1,0 +1,24 @@
+// TODO: add environment variables.
+export default {
+  vapid: {
+    mailto: 'mailto:EMAIL',
+    publicKey: 'VAPID_PUBLIC',
+    privateKey: 'VAPID_PRIVATE'
+  },
+  notif: {
+    message: {
+      title: '🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔',
+      body: 'Let op, de deurbel is gegaan!'
+    },
+    keys: {
+      auth: 'TODO_REMOVE',
+      p256dh: 'TODO_REMOVE'
+    },
+  },
+  mqtt: {
+    brokerEndpoint: 'mqtt://test.mosquitto.org',
+  },
+  db: {
+    path: './db/door-alarm.db',
+  }
+}

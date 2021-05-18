@@ -17,6 +17,10 @@ lerna-debug.log*
 /coverage
 /.nyc_output
 
+# Custom files
+config.ts
+*.db
+
 # IDEs and editors
 /.idea
 .project
