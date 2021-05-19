@@ -99,7 +99,7 @@ export class AppService {
   /**
    * Get all Push Subscriptions from database.
    */
-  _getPushSubscriptionsFromDatabase() {
+  _getPushSubscriptionsFromDatabase(): Promise<DatabasePushSubscription[]> {
     // Check if db is init properly
     if (!this.db) {
       this.logger.error(`Database initialized improperly, cannot retrieve subscriptions.`, this.className);
@@ -116,7 +116,7 @@ export class AppService {
         });
       })
     })
-      .then((result) => result);
+      .then((result: DatabasePushSubscription[]) => result);
   }
 
 

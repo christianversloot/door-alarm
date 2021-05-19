@@ -18,7 +18,6 @@ lerna-debug.log*
 /.nyc_output
 
 # Custom files
-config.ts
 *.db
 
 # IDEs and editors

@@ -24,6 +24,7 @@
     "@nestjs/platform-express": "^6.0.0",
     "class-transformer": "^0.4.0",
     "class-validator": "^0.13.1",
+    "dotenv": "^9.0.2",
     "mqtt": "^4.2.6",
     "reflect-metadata": "^0.1.12",
     "rimraf": "^2.6.2",
