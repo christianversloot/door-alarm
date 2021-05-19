@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SwPush } from '@angular/service-worker';
@@ -58,12 +58,19 @@ export class AccordService {
 
   /** */
   _addKeysToStore(sub: SubscriptionObject): Subscription {
+    // Generate headers
+    const headers = new HttpHeaders()
+      .set('token', environment.backend_token);
+    // Make POST request
     return this.http.post(
       `${environment.backend_endpoint}/push-subscription`,
       {
         endpoint: sub.endpoint,
         authKey: sub.keys.auth,
         p256dhKey: sub.keys.p256dh,
+      },
+      {
+        headers
       }
     )
       .subscribe(
