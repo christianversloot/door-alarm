@@ -1,11 +1,13 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, LoggerService } from '@nestjs/common';
 import * as webpush from 'web-push';
 import * as mqtt from 'mqtt';
 import config from './config';
 import NotificationPayload from './interfaces/notification-payload';
-import PushSubscription from './interfaces/push-subscription';
+import DatabasePushSubscription from './interfaces/database-push-subscription';
 import * as sqlite from 'sqlite3';
 import * as fs from 'fs';
+import { PushSubscriptionDto } from './dtos/push-subscription.dto';
+import Utils from './utils';
 
 @Injectable()
 export class AppService {
@@ -13,6 +15,8 @@ export class AppService {
   /** Private variables */
   private db: any;
   private mqttClient: mqtt.MqttClient;
+  private readonly logger = new Logger();
+  private readonly className = Utils.getClassName(this.constructor);
 
 
   /**
@@ -29,16 +33,18 @@ export class AppService {
     );
     // Connect to MQTT broker
     this.mqttClient  = mqtt.connect(config.mqtt.brokerEndpoint);
-    // Subscribe to 'doorbell' topic
+    // Subscribe to configured topic
     this.mqttClient.on('connect', () => {
-      this.mqttClient.subscribe('doorbell', (err) => {
+      this.mqttClient.subscribe(config.mqtt.topic, (err) => {
         if (!err) {
-          // client.publish('doorbell', 'Hello mqtt')
+          this.logger.log(`Subscribed to '${config.mqtt.topic}' topic at '${config.mqtt.brokerEndpoint}' - ready for sending notifications.`, this.className);
+          return true;
         }
+        this.logger.error(`Error subscribing to '${config.mqtt.topic}' topic: ${err}`, this.className);
       });
     });
-    // Act on message in 'doorbell' topic
-    this.mqttClient.on('message', () => this._sendPushNotification());
+    // Act on message in configured topic
+    this.mqttClient.on('message', () => this._sendPushNotifications());
   }
 
   
@@ -60,25 +66,43 @@ export class AppService {
   /**
    * Add a subscription into the database.
    */
-  _addSubscriptionToDatabase(subscription: PushSubscription) {
+  _addSubscriptionToDatabase(subscription: PushSubscriptionDto): Promise<PushSubscriptionDto> {
     // Check if db is init properly
     if (!this.db) {
+      this.logger.error(`Database initialized improperly, cannot add subscription.`, this.className);
       throw new InternalServerErrorException('Database initialization error.');
     }
     // Add endpoint into table
-    this.db.serialize(() => {
-      // Run prepared statement
-      this.db.run('INSERT INTO endpoints VALUES (?, ?, ?);', ['a', 'b', 'c']);
-    });
+    return new Promise((resolve, reject) => {
+      this.db.serialize(() => {
+        // Run prepared statement
+        this.db.run('INSERT INTO endpoints VALUES (?, ?, ?);', [subscription.endpoint, subscription.authKey, subscription.p256dhKey], (error) => {
+          if (!!error) {
+            this.logger.error(`Error when adding subscription: ${error}`, this.className);
+            reject(error);
+            return false;
+          }
+          this.logger.log(`Successfully added subscription.`, this.className);
+          resolve(true);
+        });
+      });
+    })
+      // Return subscription in POST response.
+      .then(() => subscription)
+      // Graceful response on error in database Promise
+      .catch((error) => {
+        throw new InternalServerErrorException(error);
+      });
   }
 
 
   /**
-   * Get all Push endpoints from database.
+   * Get all Push Subscriptions from database.
    */
-  _getPushEndpointsFromDatabase() {
+  _getPushSubscriptionsFromDatabase() {
     // Check if db is init properly
     if (!this.db) {
+      this.logger.error(`Database initialized improperly, cannot retrieve subscriptions.`, this.className);
       throw new InternalServerErrorException('Database initialization error.');
     }
     // Get all endpoints from table
@@ -109,7 +133,7 @@ export class AppService {
     const db = new sqlite.Database(path);
     // Add table if necessary
     db.serialize(() => {
-      db.run('CREATE TABLE IF NOT EXISTS endpoints (endpoint TEXT, auth_key TEXT, p_key TEXT);');
+      db.run('CREATE TABLE IF NOT EXISTS endpoints (endpoint TEXT NOT NULL PRIMARY KEY, auth_key TEXT, p_key TEXT);');
     });
     // Return database
     return db;
@@ -128,24 +152,49 @@ export class AppService {
     };
   }
 
+  /**
+   * Send notification to registered Push Subscribers
+   */
+  _sendPushNotifications(): void {
+    this.logger.log(`Sending push notifications to subscribers.`, this.className);
+    // Get registered push subscribers
+    this._getPushSubscriptionsFromDatabase()
+      .then((subscriptions: DatabasePushSubscription[]) => {
+        this.logger.log(`Retrieved push subscriptions. Sending notification to each.`, this.className);
+        const promises = [];
+        // Iterate over every subscription
+        for (const subscription of subscriptions) {
+          // Push and resolve Promise that sends a notification
+          promises.push(new Promise((resolve) => {
+            this._sendPushNotification(subscription)
+              .then(() => resolve(true));
+          }));
+        }
+        // Continue when all Promises are in end state (success/fail)
+        Promise.all(promises).then(() => this.logger.log(`Completed sending push notifications.`, this.className));
+      })
+      .catch((error) => this.logger.error(`Error sending push notifications: ${error}`, this.className));
+  }
+
 
   /**
-   * Send a push notification.
+   * Send notification to registered Push Subscriber
    */
-  _sendPushNotification(ep: string = undefined): void {
+  _sendPushNotification(subscription: DatabasePushSubscription): Promise<void> {
     // Get notification payload
     const notificationPayload = this._getNotificationPayload();
-    // Define subscription
-    const subscription = {
-      endpoint: ep,
+    // Define Push Service payload
+    const pushServicePayload = {
+      endpoint: subscription.endpoint,
       keys: {
-        auth: config.notif.keys.auth,
-        p256dh: config.notif.keys.p256dh
+        auth: subscription.auth_key,
+        p256dh: subscription.p_key
       }
     };
     // Send notification to Push Service
-    webpush.sendNotification(subscription, JSON.stringify(notificationPayload))
-      .then((r) => r);
+    return webpush.sendNotification(pushServicePayload, JSON.stringify(notificationPayload))
+      .then((r) => this.logger.log(`Sent push notification.`, this.className))
+      .catch((error) => this.logger.error(`Error sending push notification: ${error}`, this.className));
   }
 
 
