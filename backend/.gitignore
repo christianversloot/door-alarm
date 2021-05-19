@@ -19,6 +19,7 @@ lerna-debug.log*
 
 # Custom files
 *.db
+.env
 
 # IDEs and editors
 /.idea
