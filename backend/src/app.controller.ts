@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Logger, Post } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Post, UseGuards } from '@nestjs/common';
 import { AppService } from './app.service';
 import { PushSubscriptionDto } from './dtos/push-subscription.dto';
+import { AuthGuard } from './guards/authguard';
 import Utils from './utils';
 
 @Controller()
@@ -17,6 +18,7 @@ export class AppController {
    * Register new PushSubscription
    */
   @Post('push-subscription')
+  @UseGuards(AuthGuard)
   registerNewPushSubscription(
     @Body() subscription: PushSubscriptionDto
   ): Promise<PushSubscriptionDto> {

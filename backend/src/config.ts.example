@@ -17,8 +17,12 @@ export default {
   },
   mqtt: {
     brokerEndpoint: 'mqtt://test.mosquitto.org',
+    topic: 'doorbell',
   },
   db: {
-    path: './db/door-alarm.db',
-  }
+    folder: './db',
+    path: 'door-alarm.db',
+  },
+  port: 3000,
+  authToken: 'your_token_here'
 }
